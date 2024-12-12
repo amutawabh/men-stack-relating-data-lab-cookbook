@@ -1,61 +1,60 @@
-const express = require('express');
-const methodOverride = require('method-override');
-const morgan = require('morgan');
+const express = require("express");
+const morgan = require("morgan");
+const methodOverride = require("method-override");
 const session = require('express-session');
-const MongoStore = require('connect-mongo');
-const addUserToViews = require('./middleware/addUserToViews');
-require('dotenv').config();
-require('./config/database');
+const MongoStore = require("connect-mongo");
+const AddUserToViews = require('./middleware/addUserToViews.js');
+const isSignedIn = require("./middleware/isSignedIn.js");
+const path = require('path');
+require("dotenv").config();
+require('./config/database')
 
-// Controllers
-const authController = require('./controllers/auth');
-const isSignedIn = require('./middleware/isSignedIn');
+// Controllers 
+
+const authController = require("./controllers/auth.js");
+const recipesController = require("./controllers/recipes.js");
+const ingredientsController = require("./controllers/ingredients.js");
 
 const app = express();
-// Set the port from environment variable or default to 3000
-const port = process.env.PORT ? process.env.PORT : '3000';
 
-// MIDDLEWARE
+// Set the port from environment variable or default to 3000
+const port = process.env.PORT ? process.env.PORT : "3000";
+
+app.listen(port, () => {
+    console.log(`The express app is ready on port ${port}!`);
+});
+
+// Middleware
 
 // Middleware to parse URL-encoded data from forms
 app.use(express.urlencoded({ extended: false }));
 // Middleware for using HTTP verbs such as PUT or DELETE
-app.use(methodOverride('_method'));
+app.use(methodOverride("_method"));
 // Morgan for logging HTTP requests
 app.use(morgan('dev'));
+app.use(express.static(path.join(__dirname, 'public')));
 app.use(
-  session({
-    secret: process.env.SESSION_SECRET,
-    resave: false,
-    saveUninitialized: true,
-    store: MongoStore.create({
-      mongoUrl: process.env.MONGODB_URI,
-    }),
-  })
+    session({
+        secret: process.env.SESSION_SECRET,
+        resave: false,
+        saveUninitialized: true,
+        store: MongoStore.create({
+            mongoUrl: process.env.MONGODB_URI,
+        }),
+    })
 );
 
-app.use(addUserToViews);
+app.use("/auth", authController);
+
+app.use(AddUserToViews);
+
 
 // Public Routes
-app.get('/', async (req, res) => {
-  res.render('index.ejs');
+
+// GET /
+app.get("/", async (req, res) => {
+    res.render("index.ejs");
 });
 
-app.use('/auth', authController);
-
-// Protected Routes
-app.use(isSignedIn);
-
-app.get('/protected', async (req, res) => {
-  if (req.session.user) {
-    res.send(`Welcome to the party ${req.session.user.username}.`);
-  } else {
-    res.sendStatus(404);
-    // res.send('Sorry, no guests allowed.');
-  }
-});
-
-app.listen(port, () => {
-  // eslint-disable-next-line no-console
-  console.log(`The express app is ready on port ${port}!`);
-});
+app.use('/recipes', isSignedIn, recipesController)
+app.use('/ingredients', isSignedIn, ingredientsController)
